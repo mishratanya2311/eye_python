@@ -1283,7 +1283,7 @@ class EyeWithinWordsApp:
             return
 
         geom = self.geom
-        bx, by, bw, bh = self.eye_box_rect
+        bx, by, _, _ = self.eye_box_rect
         local_cx = geom.center_x - bx
         local_cy = geom.center_y - by
 
@@ -1325,19 +1325,25 @@ class EyeWithinWordsApp:
                     special_flags=pygame.BLEND_RGBA_ADD,
                 )
 
-            # Concentric iris rings with slow color transition
+            # Concentric iris rings with slow color transition + ROTATING innermost rings
             iris_mix = 0.5 + 0.5 * math.sin(now * 0.60)
             rings_a = self.iris_layers.get("rings_a")
             rings_b = self.iris_layers.get("rings_b")
             if rings_a is not None and rings_b is not None:
                 rw, rh = rings_a.get_size()
                 rx, ry = iris_cx - rw // 2, iris_cy - rh // 2
+
+                # Rotate the innermost rings (rings_b = phase-shifted colors) for living eye effect
+                ring_rotation = now * 8.0  # degrees per second - gentle rotation
+                rotated_rings_b = pygame.transform.rotate(rings_b, ring_rotation)
+                rb_w, rb_h = rotated_rings_b.get_size()
+
                 rings_a.set_alpha(255)
                 self.eye_box_canvas.blit(rings_a, (rx, ry))
                 rings_b.set_alpha(int(iris_mix * 255))
-                self.eye_box_canvas.blit(rings_b, (rx, ry))
+                self.eye_box_canvas.blit(rotated_rings_b, (iris_cx - rb_w // 2, iris_cy - rb_h // 2))
 
-            # Radial iris spokes with subtle breathing
+            # Radial iris spokes with subtle breathing + rotation
             rad_a = self.iris_layers.get("radial_a")
             rad_b = self.iris_layers.get("radial_b")
             if rad_a is not None and rad_b is not None:
@@ -1346,21 +1352,34 @@ class EyeWithinWordsApp:
                 srw, srh = int(rw * r_scale), int(rh * r_scale)
                 s_ra = pygame.transform.smoothscale(rad_a, (srw, srh))
                 s_rb = pygame.transform.smoothscale(rad_b, (srw, srh))
+
+                # Rotate radial spokes in opposite directions for depth
+                radial_rot = now * 12.0  # degrees per second
+                s_ra_rot = pygame.transform.rotate(s_ra, radial_rot)
+                s_rb_rot = pygame.transform.rotate(s_rb, -radial_rot * 0.7)
+                ra_w, ra_h = s_ra_rot.get_size()
+                rb_w, rb_h = s_rb_rot.get_size()
+
                 rx, ry = iris_cx - srw // 2, iris_cy - srh // 2
                 s_ra.set_alpha(230)
-                self.eye_box_canvas.blit(s_ra, (rx, ry))
+                self.eye_box_canvas.blit(s_ra_rot, (iris_cx - ra_w // 2, iris_cy - ra_h // 2))
                 s_rb.set_alpha(int(iris_mix * 230))
-                self.eye_box_canvas.blit(s_rb, (rx, ry))
+                self.eye_box_canvas.blit(s_rb_rot, (iris_cx - rb_w // 2, iris_cy - rb_h // 2))
 
-            # Deep circular Pupil with subtle dilation/contraction
+            # Deep circular Pupil with subtle dilation/contraction + rotation
             pupil_surf = self.iris_layers.get("pupil")
             if pupil_surf is not None:
                 pw, ph = pupil_surf.get_size()
                 p_scale = 1.0 + 0.055 * math.sin(now * 0.92) + 0.035 * (1.0 - openness)
                 spw, sph = int(pw * p_scale), int(ph * p_scale)
                 s_pupil = pygame.transform.smoothscale(pupil_surf, (spw, sph))
+
+                # Slow counter-rotation for pupil words
+                pupil_rot = now * (-6.0)  # slow counter-clockwise
+                s_pupil_rot = pygame.transform.rotate(s_pupil, pupil_rot)
+                pp_w, pp_h = s_pupil_rot.get_size()
                 self.eye_box_canvas.blit(
-                    s_pupil, (iris_cx - spw // 2, iris_cy - sph // 2)
+                    s_pupil_rot, (iris_cx - pp_w // 2, iris_cy - pp_h // 2)
                 )
 
             # Crisp corneal highlight words
